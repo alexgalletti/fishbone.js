@@ -1,4 +1,3 @@
-
 // Fishbone.js
 //
 // Version: 1.0.1
@@ -6,106 +5,123 @@
 // Author: Martin Kleppe <kleppe@ubilabs.net>
 // License: WTFPL
 
-Model =
+Model = function _(object) {
 
-function _(
-  object, // module definition
-  key, value, // placeholder
-  undefined
-){
+    function Klass() {
+        var self = this,
+            observers = {},
+            attributes = {};
 
-  // return class constructor
-  function Klass(){
-    
-    // references used across instance
-    var target = this,
-      observers = {};
-  
-    // add an event listener
-    target.on = function(event, listener){
-      // push listerner to list of observers
-      (observers[event] || (observers[event] = []))
-        .push(listener);
-    };
-    
-    // trigger a given event
-    target.trigger = function(event, data){
-      for (
-        // cycle through all listerners for a given event
-        var value = observers[event], key = 0;
-        value && key < value.length;
-      ){
-        // call listener and pass data
-        value[key++](data);
-      }
-    };
+        /**
+         * Set attribute value by key
+         * @param {string} key
+         * @param {void} value
+         * @return {this}
+         */
+        self.set = function (key, value) {
+            self.attributes[key] = value;
+            self.trigger('change', [key, value]);
+            self.trigger('change:' + key, value);
+            return self;
+        };
 
-    // remove (a single or all) event listener
-    target.off = function (event, listener) {
-      for (
-        // get index of the given listener
-        value = observers[event] || [];
-        // find all occurrences
-        listener && (key = value.indexOf(listener)) > -1;
-      ){
-        // remove the listener
-        value.splice(key, 1);
-      }
+        /**
+         * Confirms existance of attribute
+         * @param  {string}  key
+         * @return {boolean}
+         */
+        self.has = function (key) {
+            return typeof self.attributes[key] !== 'undefined';
+        };
 
-      // assign the new list
-      observers[event] = listener ? value : [];
-    };
+        /**
+         * Returns attribute by key
+         * @param  {string} key
+         * @return {void}
+         */
+        self.get = function (key) {
+            return self.attributes[key];
+        };
 
-    // cycle through all properties
-    for (key in object) {
-      value = object[key];
-        
-      // test if value is a function
-      target[key] = (typeof value == 'function') ?
+        /**
+         * Remove attribute by key
+         * @param  {string} key
+         * @return {this}
+         */
+        self.unset = function (key) {
+            delete self.attributes[key];
+            return self;
+        };
 
-        // wrap method
-        function(){
-          // add chainablity if nothing was returned
-          return (
-            // keep the original context
-            value = this.apply(target, arguments)
-          ) === undefined ? target : value;
-        }.bind(value) :
-      
-        // copy property
-        value;
+        /**
+         * Register an event listener with a callback
+         * @param  {string} event
+         * @param  {function} listener
+         * @return {this}
+         */
+        self.on = function(event, listener) {
+            (observers[event] || (observers[event] = [])).push(listener);
+            return self;
+        };
+
+        /**
+         * Triggers all events with specified data
+         * @param  {string} event
+         * @param  {void} data
+         * @return {this}
+         */
+        self.trigger = function(event, data) {
+            for (var listeners = observers[event], key = 0; listeners && key < listeners.length;) {
+                listeners[key++](data);
+            }
+            return self;
+        };
+
+        /**
+         * Remove all event listeners for the specified event
+         * @param  {string} event
+         * @param  {function} listener
+         * @return {this}
+         */
+        self.off = function(event, listener) {
+            for (listeners = observers[event] || [];listener && (key = listeners.indexOf(listener)) > -1;) {
+                listeners.splice(key, 1);
+            }
+            observers[event] = listener ? listeners : [];
+            return self;
+        };
+
+        for (var key in object) {
+            var value = object[key];
+            self[key] = (typeof value === 'function') ? function() {return (value = this.apply(self, arguments)) === undefined ? self : value;}.bind(value) : value;
+        }
+
+        self.init && self.init.apply(self, arguments);
     }
 
-    target.init && target.init.apply(target, arguments);
-  }
+    /**
+     * Extends uninitalized class with a fresh instance
+     * @param  {object} overrides
+     * @return {function}
+     */
+    Klass.extend = function(overrides) {
+        var value = {};
 
-  // allow class to be extended
-  Klass.extend = function(overrides){
-    
-    value = {};
+        for (var key in object) {
+            value[key] = object[key];
+        }
 
-    // copy all object properties
-    for (key in object){
-      value[key] = object[key];
-    }
+        for (key in overrides) {
+            value[key] = overrides[key];
+            object[key] !== undefined && (value['__' + key] = object[key]);
+        }
 
-    // override object properties
-    for (key in overrides){
-      value[key] = overrides[key];
-      
-      // store reference to super properties
-      object[key] !== undefined && (
-        value["__" + key] = object[key]
-      );
-    }
+        return _(value);
+    };
 
-    return _(value);
-  };
-
-  return Klass;
+    return Klass;
 };
 
-// make module Node.js compatible
-if (typeof module == "object") {
-  module.exports = Model;
+if (typeof module === 'object') {
+    module.exports = Model;
 }
