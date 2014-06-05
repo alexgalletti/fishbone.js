@@ -80,7 +80,6 @@ while (rounds--){
 }
 ```
 
-```
 
 ### Browser Support
 
